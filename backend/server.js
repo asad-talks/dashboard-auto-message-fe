@@ -13,6 +13,13 @@ app.use(cors({
 }))
 app.use(express.json())
 
+// Support both direct routes (/drivers) and Vercel rewrite routes (/api/drivers)
+app.use((req, _res, next) => {
+  if (req.url === '/api') req.url = '/'
+  else if (req.url.startsWith('/api/')) req.url = req.url.replace(/^\/api/, '')
+  next()
+})
+
 // ─── Health ───────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
@@ -226,16 +233,31 @@ app.get('/analytics/balance-history', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-// ─── Start ────────────────────────────────────────────────
+// ─── Start / Init ─────────────────────────────────────────
 const PORT = process.env.PORT || 8000
+let dbInitPromise
 
-initDb()
-  .then(() => {
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
-  })
-  .catch(err => {
-    console.error('Failed to init DB:', err)
-    process.exit(1)
-  })
+function ensureDbInit() {
+  if (!dbInitPromise) {
+    dbInitPromise = initDb().catch((err) => {
+      dbInitPromise = undefined
+      throw err
+    })
+  }
+  return dbInitPromise
+}
+
+if (process.env.VERCEL) {
+  ensureDbInit().catch(err => console.error('Failed to init DB on Vercel:', err))
+} else {
+  ensureDbInit()
+    .then(() => {
+      app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
+    })
+    .catch(err => {
+      console.error('Failed to init DB:', err)
+      process.exit(1)
+    })
+}
 
 module.exports = app

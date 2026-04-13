@@ -83,7 +83,7 @@ export default function LoginPage() {
             </button>
           </form>
           <p className="text-center text-xs text-gray-700 mt-4">
-            Default: <span className="font-mono text-gray-600">adminazamjonov / adminazamjonov</span>
+            {/* Default: <span className="font-mono text-gray-600">admin / adminazamjonov</span> */}
           </p>
         </div>
       </div>

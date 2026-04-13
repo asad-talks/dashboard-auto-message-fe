@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Users, Wallet, MessageSquare, Layers } from 'lucide-react'
+import { Users, Wallet, MessageSquare, Layers, RefreshCw } from 'lucide-react'
 import api from '../utils/api'
 
 function StatCard({ icon: Icon, label, value, color = 'indigo' }) {
@@ -21,27 +21,70 @@ function StatCard({ icon: Icon, label, value, color = 'indigo' }) {
 export default function DashboardPage() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [userbots, setUserbots] = useState([])
 
-  useEffect(() => {
-    Promise.all([api.get('/userbots/stats/overview'), api.get('/userbots')]).then(([statsRes, userbotsRes]) => {
+  const formatMoney = (amount) => {
+    const value = Number(amount || 0)
+    if (Math.abs(value) < 1000) return value.toString()
+
+    const units = [
+      { value: 1000000, suffix: 'm' },
+      { value: 1000, suffix: 'k' },
+    ]
+
+    for (const unit of units) {
+      if (Math.abs(value) >= unit.value) {
+        const shortValue = value / unit.value
+        const isWhole = Number.isInteger(shortValue)
+        return `${isWhole ? shortValue : shortValue.toFixed(1)}${unit.suffix}`
+      }
+    }
+
+    return value.toString()
+  }
+
+  const fetchDashboardData = async () => {
+    const [statsRes, userbotsRes] = await Promise.all([api.get('/userbots/stats/overview'), api.get('/userbots')])
       setStats(statsRes.data)
       setUserbots(userbotsRes.data)
-    }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchDashboardData().finally(() => setLoading(false))
   }, [])
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await fetchDashboardData()
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" /></div>
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-lg font-semibold text-white">Dashboard</h1>
-        <p className="text-sm text-gray-600">Overview of your userbots</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-white">Dashboard</h1>
+          <p className="text-sm text-gray-600">Overview of your userbots</p>
+        </div>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-white/[0.1] bg-white/[0.02] text-gray-200 hover:bg-white/[0.05] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+          {syncing ? 'Syncing...' : 'Sync'}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={Users} label="Total Userbots" value={stats?.total_userbots ?? 0} color="indigo" />
-        <StatCard icon={Wallet} label="Total Balance" value={Number(stats?.total_balance ?? 0).toFixed(2)} color="amber" />
+        <StatCard icon={Wallet} label="Total Balance" value={formatMoney(stats?.total_balance)} color="amber" />
         <StatCard icon={Layers} label="Total Groups" value={stats?.total_groups ?? 0} color="emerald" />
         <StatCard icon={MessageSquare} label="Active Auto Posts" value={stats?.active_autoposts ?? 0} color="sky" />
       </div>
@@ -57,7 +100,7 @@ export default function DashboardPage() {
               <span className="text-xs font-mono text-gray-400">{u.phone}</span>
               <div className="flex items-center gap-3 text-xs">
                 <span className="text-gray-600">{u.groups_count} groups</span>
-                <span className="text-emerald-400">{Number(u.balance || 0).toFixed(2)}</span>
+                <span className="text-emerald-400">{formatMoney(u.balance)}</span>
               </div>
             </div>
           ))}

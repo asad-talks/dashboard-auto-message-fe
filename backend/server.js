@@ -3,7 +3,8 @@ const cors = require('cors')
 const bcrypt = require('bcryptjs')
 const { query, initDb } = require('./db')
 const { createToken, requireAuth } = require('./auth')
-
+const dotenv = require('dotenv')
+dotenv.config()
 const app = express()
 
 app.use(cors({

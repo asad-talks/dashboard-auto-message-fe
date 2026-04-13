@@ -1,8 +1,10 @@
 const { Pool } = require('pg')
+const dotenv = require('dotenv')
+dotenv.config()
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('railway') || process.env.DATABASE_URL?.includes('neon')
+  connectionString: 'postgresql://postgres:FTXVHEyUmXiSBraRmmSMTZPPNwgmRQHU@metro.proxy.rlwy.net:38499/railway',
+  ssl: 'postgresql://postgres:FTXVHEyUmXiSBraRmmSMTZPPNwgmRQHU@metro.proxy.rlwy.net:38499/railway'?.includes('railway') || 'postgresql://postgres:FTXVHEyUmXiSBraRmmSMTZPPNwgmRQHU@metro.proxy.rlwy.net:38499/railway'?.includes('neon')
     ? { rejectUnauthorized: false }
     : false,
 })
@@ -16,8 +18,8 @@ async function query(text, params) {
     client.release()
   }
 }
-
 async function initDb() {
+ 
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,

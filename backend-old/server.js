@@ -3,7 +3,8 @@ const cors = require('cors')
 const bcrypt = require('bcryptjs')
 const { query, initDb } = require('./db')
 const { createToken, requireAuth } = require('./auth')
-
+const dotenv = require('dotenv')
+dotenv.config()
 const app = express()
 
 app.use(cors({
@@ -12,13 +13,18 @@ app.use(cors({
 }))
 app.use(express.json())
 
-const router = express.Router()
+// Support both direct routes (/drivers) and Vercel rewrite routes (/api/drivers)
+app.use((req, _res, next) => {
+  if (req.url === '/api') req.url = '/'
+  else if (req.url.startsWith('/api/')) req.url = req.url.replace(/^\/api/, '')
+  next()
+})
 
 // ─── Health ───────────────────────────────────────────────
-router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }))
 
 // ─── Auth ─────────────────────────────────────────────────
-router.post('/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body
     const result = await query('SELECT * FROM users WHERE username = $1', [username])
@@ -34,7 +40,7 @@ router.post('/auth/login', async (req, res) => {
 })
 
 // ─── Drivers ──────────────────────────────────────────────
-router.get('/drivers', requireAuth, async (req, res) => {
+app.get('/drivers', requireAuth, async (req, res) => {
   try {
     const result = await query(`
       SELECT d.*, COUNT(DISTINCT g.id)::int as groups_count
@@ -46,7 +52,7 @@ router.get('/drivers', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.get('/drivers/stats/overview', requireAuth, async (req, res) => {
+app.get('/drivers/stats/overview', requireAuth, async (req, res) => {
   try {
     const [total, active, balance, msgs, activity] = await Promise.all([
       query('SELECT COUNT(*)::int as c FROM drivers'),
@@ -67,7 +73,7 @@ router.get('/drivers/stats/overview', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.post('/drivers', requireAuth, async (req, res) => {
+app.post('/drivers', requireAuth, async (req, res) => {
   try {
     const { phone, api_id, api_hash } = req.body
     const exists = await query('SELECT id FROM drivers WHERE phone = $1', [phone])
@@ -82,7 +88,7 @@ router.post('/drivers', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.post('/drivers/:id/topup', requireAuth, async (req, res) => {
+app.post('/drivers/:id/topup', requireAuth, async (req, res) => {
   try {
     const { amount, note } = req.body
     const result = await query(
@@ -98,7 +104,7 @@ router.post('/drivers/:id/topup', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.patch('/drivers/:id/status', requireAuth, async (req, res) => {
+app.patch('/drivers/:id/status', requireAuth, async (req, res) => {
   try {
     const cur = await query('SELECT userbot_status FROM drivers WHERE id = $1', [req.params.id])
     if (!cur.rows.length) return res.status(404).json({ detail: 'Not found' })
@@ -111,7 +117,7 @@ router.patch('/drivers/:id/status', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.delete('/drivers/:id', requireAuth, async (req, res) => {
+app.delete('/drivers/:id', requireAuth, async (req, res) => {
   try {
     const result = await query('DELETE FROM drivers WHERE id = $1 RETURNING id', [req.params.id])
     if (!result.rows.length) return res.status(404).json({ detail: 'Not found' })
@@ -120,7 +126,7 @@ router.delete('/drivers/:id', requireAuth, async (req, res) => {
 })
 
 // ─── Groups ───────────────────────────────────────────────
-router.get('/groups', requireAuth, async (req, res) => {
+app.get('/groups', requireAuth, async (req, res) => {
   try {
     const { driver_id } = req.query
     const result = driver_id
@@ -130,7 +136,7 @@ router.get('/groups', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.post('/groups', requireAuth, async (req, res) => {
+app.post('/groups', requireAuth, async (req, res) => {
   try {
     let { driver_id, username, title } = req.body
     if (!username.startsWith('@')) username = '@' + username
@@ -144,7 +150,7 @@ router.post('/groups', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.delete('/groups/:id', requireAuth, async (req, res) => {
+app.delete('/groups/:id', requireAuth, async (req, res) => {
   try {
     const result = await query('DELETE FROM groups WHERE id = $1 RETURNING id', [req.params.id])
     if (!result.rows.length) return res.status(404).json({ detail: 'Not found' })
@@ -153,7 +159,7 @@ router.delete('/groups/:id', requireAuth, async (req, res) => {
 })
 
 // ─── Broadcast ────────────────────────────────────────────
-router.post('/broadcast/send', requireAuth, async (req, res) => {
+app.post('/broadcast/send', requireAuth, async (req, res) => {
   try {
     const { content, driver_ids, group_ids } = req.body
     if (!content?.trim()) return res.status(400).json({ detail: 'Content required' })
@@ -185,7 +191,7 @@ router.post('/broadcast/send', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.get('/broadcast/history', requireAuth, async (req, res) => {
+app.get('/broadcast/history', requireAuth, async (req, res) => {
   try {
     const result = await query('SELECT * FROM broadcasts ORDER BY created_at DESC LIMIT 50')
     res.json(result.rows)
@@ -193,7 +199,7 @@ router.get('/broadcast/history', requireAuth, async (req, res) => {
 })
 
 // ─── Analytics ────────────────────────────────────────────
-router.get('/analytics/messages-per-day', requireAuth, async (req, res) => {
+app.get('/analytics/messages-per-day', requireAuth, async (req, res) => {
   try {
     const result = await query(`
       SELECT DATE(sent_at) as date, COUNT(*)::int as count
@@ -204,7 +210,7 @@ router.get('/analytics/messages-per-day', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.get('/analytics/top-drivers', requireAuth, async (req, res) => {
+app.get('/analytics/top-drivers', requireAuth, async (req, res) => {
   try {
     const result = await query(`
       SELECT d.phone, d.id, COUNT(m.id)::int as messages_sent
@@ -216,7 +222,7 @@ router.get('/analytics/top-drivers', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-router.get('/analytics/balance-history', requireAuth, async (req, res) => {
+app.get('/analytics/balance-history', requireAuth, async (req, res) => {
   try {
     const result = await query(`
       SELECT DATE(created_at) as date, SUM(amount)::float as total_topup
@@ -227,15 +233,31 @@ router.get('/analytics/balance-history', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ detail: e.message }) }
 })
 
-// ─── Mount router under /api ──────────────────────────────
-app.use('/api', router)
+// ─── Start / Init ─────────────────────────────────────────
+const PORT = process.env.PORT || 8000
+let dbInitPromise
 
-// ─── Local dev only — Vercel does NOT use app.listen ──────
-if (process.env.VERCEL !== '1') {
-  const PORT = process.env.PORT || 8000
-  initDb()
-    .then(() => app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`)))
-    .catch(err => { console.error('Failed to init DB:', err); process.exit(1) })
+function ensureDbInit() {
+  if (!dbInitPromise) {
+    dbInitPromise = initDb().catch((err) => {
+      dbInitPromise = undefined
+      throw err
+    })
+  }
+  return dbInitPromise
+}
+
+if (process.env.VERCEL) {
+  ensureDbInit().catch(err => console.error('Failed to init DB on Vercel:', err))
+} else {
+  ensureDbInit()
+    .then(() => {
+      app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
+    })
+    .catch(err => {
+      console.error('Failed to init DB:', err)
+      process.exit(1)
+    })
 }
 
 module.exports = app

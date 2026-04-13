@@ -5,6 +5,8 @@ const { query, initDb } = require('./db')
 const { createToken, requireAuth } = require('./auth')
 
 const app = express()
+const dotenv = require('dotenv')
+dotenv.config()
 
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
@@ -228,7 +230,7 @@ router.get('/analytics/balance-history', requireAuth, async (req, res) => {
 })
 
 // ─── Mount router under /api ──────────────────────────────
-app.use('/api', router)
+app.use('/', router)
 
 // ─── Local dev only — Vercel does NOT use app.listen ──────
 if (process.env.VERCEL !== '1') {

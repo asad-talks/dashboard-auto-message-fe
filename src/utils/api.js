@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // /api is routed to the serverless backend by vercel.json
 // In local dev, vite proxies /api → localhost:8000
-const BASE_URL = '/api'
+const BASE_URL = 'https://dashboard-auto-message-be.vercel.app/api'
 
 const api = axios.create({ baseURL: BASE_URL })
 

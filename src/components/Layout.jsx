@@ -9,9 +9,9 @@ import clsx from 'clsx'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/drivers', icon: Users, label: 'Drivers' },
+  { to: '/drivers', icon: Users, label: 'Userbots' },
   { to: '/groups', icon: FolderOpen, label: 'Groups' },
-  { to: '/broadcast', icon: Megaphone, label: 'Broadcast' },
+  { to: '/broadcast', icon: Megaphone, label: 'Auto Posts' },
   { to: '/analytics', icon: BarChart2, label: 'Analytics' },
 ]
 
